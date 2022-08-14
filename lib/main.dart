@@ -54,7 +54,7 @@ class MapSampleState extends State<MapSample> {
 
   static final CameraPosition _vaiBeach = CameraPosition(
     target: LatLng(35.2530876, 26.2626557),
-    zoom: 12,
+    zoom: 7,
   );
 
   @override
