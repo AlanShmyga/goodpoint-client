@@ -6,6 +6,9 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+Set<Marker> markerSet = Set();
+List<Point> points = List.empty();
+
 void main() => runApp(GoodPoint());
 
 class GoodPoint extends StatelessWidget {
@@ -14,6 +17,23 @@ class GoodPoint extends StatelessWidget {
     return MaterialApp(
       title: 'Good Point',
       home: MapSample(),
+    );
+  }
+}
+
+class PointList extends StatelessWidget {
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      itemCount: markerSet.length,
+      itemBuilder: (builder, index) {
+        final point = points[index];
+        return ListTile(
+          title: Text(point.title),
+          subtitle: Text(point.description),
+        );
+      }
     );
   }
 }
@@ -29,8 +49,8 @@ class MapSampleState extends State<MapSample> {
     markerId: MarkerId("Venetian Fortezza Castle"),
     position: LatLng(35.37236770428797, 24.47105981431628),
     infoWindow: InfoWindow(title: "This Is Info Window"),
-    onTap: () {},);
-  Set<Marker> markerSet = Set();
+    onTap: () {},
+  );
 
   static final CameraPosition _vaiBeach = CameraPosition(
     target: LatLng(35.2530876, 26.2626557),
@@ -40,24 +60,63 @@ class MapSampleState extends State<MapSample> {
   @override
   Widget build(BuildContext context) {
     return new Scaffold(
-      body: GoogleMap(
-        initialCameraPosition: _vaiBeach,
-        myLocationEnabled: true,
-        zoomControlsEnabled: true,
-        onMapCreated: (GoogleMapController controller) {
-          _controller.complete(controller);
-        },
-        markers: markerSet,
+      body: Stack(
+        children: [
+        GoogleMap(
+              initialCameraPosition: _vaiBeach,
+              myLocationEnabled: true,
+              zoomControlsEnabled: true,
+              onMapCreated: (GoogleMapController controller) {
+                _controller.complete(controller);
+              },
+              markers: markerSet,
+          ),
+          // PointList()
+        ],
       ),
-      appBar: AppBar(actions: [
-        IconButton(
-            onPressed: _searchNearby,
-            icon: const Icon(Icons.place)),
-        IconButton(
-            onPressed: _clearMarkers,
-            icon: const Icon(Icons.clear))
-      ],),
-    );
+      bottomNavigationBar: Container(
+        height: 90,
+        child:
+          Column(
+            children: [
+              Flexible(
+                  flex: 9,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      Column(
+                        children: [
+                          IconButton(onPressed: _searchNearby, icon: const Icon(Icons.place)),
+                          Text("Places")
+                        ],
+                      ),
+                      Column(
+                        children: [
+                          IconButton(onPressed: () => {}, icon: const Icon(Icons.route)),
+                          Text("Routes")
+                        ],
+                      ),
+                      Column(
+                          children: [
+                            IconButton(onPressed: () => {}, icon: const Icon(Icons.star)),
+                            Text("Suggest")
+                          ]
+                      ),
+                      Column(
+                        children: [
+                          IconButton(onPressed: () => {}, icon: const Icon(Icons.menu)),
+                          Text("Menu")
+                        ],
+                      ),
+                    ],
+                  ),
+              ),
+              const Spacer(flex: 2)
+            ],
+          )
+        )
+      );
   }
 
   void _searchNearby() {
@@ -66,11 +125,14 @@ class MapSampleState extends State<MapSample> {
     });
   }
 
-  Future<List<Point>> _getPoints(Point point) async {
+  void _getPoints(Point point) async {
     var pointsURI = Uri.parse("http://localhost:8080/api/points");
     final response = await http.get(pointsURI);
     if (response.statusCode == 200) {
-      return parsePoints(response.body);
+      final parsed = jsonDecode(response.body).cast<String, dynamic>();
+      points = parsed['_embedded']['points']
+          .map<Point>((json) => Point.fromJson(json))
+          .toList();
     } else {
       throw http.ClientException(
           "Unable to get Points from server.", pointsURI);
@@ -79,17 +141,16 @@ class MapSampleState extends State<MapSample> {
 
   void _getMarkers() async {
     Point pRynGlow = Point.fromCoordinates(
-        /* latitude: */ 35.37236770428797,
-        /* longitude: */ 24.47105981431628
-    );
-    List<Point> points = await _getPoints(pRynGlow);
+        /* latitude: */
+        35.37236770428797,
+        /* longitude: */ 24.47105981431628);
+    _getPoints(pRynGlow);
     for (Point point in points) {
       markerSet.add(Marker(
           markerId: MarkerId(point.title),
           position: LatLng(point.latitude, point.longitude),
           infoWindow: InfoWindow(title: point.title),
-          onTap: () {})
-      );
+          onTap: () {}));
     }
   }
 
@@ -97,11 +158,5 @@ class MapSampleState extends State<MapSample> {
     setState(() {
       markerSet.clear();
     });
-  }
-
-  List<Point> parsePoints(String body) {
-    final parsed = jsonDecode(body).cast<String,dynamic>();
-    return parsed['_embedded']['points']
-        .map<Point>((json) => Point.fromJson(json)).toList();
   }
 }
